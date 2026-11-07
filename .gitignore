@@ -8,3 +8,7 @@ build/
 
 *.tar.gz
 *.zip
+
+# Local RPM build files
+.rpmbuild/
+*.rpm

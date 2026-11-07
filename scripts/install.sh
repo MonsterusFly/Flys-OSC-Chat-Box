@@ -50,7 +50,7 @@ STAGING="$APP_HOME/.app-staging-$$"
 trap 'rm -rf -- "$STAGING"' EXIT
 mkdir -p "$STAGING"
 # Copy only application files, never build caches, git internals, or a developer venv.
-for name in main.py requirements.txt core ui integrations assets LICENSE README.md; do
+for name in main.py requirements.txt core ui integrations assets packaging scripts LICENSE README.md; do
   cp -a -- "$SOURCE_DIR/$name" "$STAGING/$name"
 done
 find "$STAGING" -type d \( -name __pycache__ -o -name .pytest_cache \) -prune -exec rm -rf {} +
@@ -84,6 +84,18 @@ Categories=AudioVideo;Utility;
 StartupNotify=true
 EOF
 chmod 644 "$DESKTOP_FILE"
+# A separate graphical uninstaller for installs made by this script.
+cat > "$DESKTOP_DIR/flys-osc-chat-box-uninstall.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Uninstall Fly's OSC Chat Box
+Comment=Remove the application and keep saved statuses
+Exec="$VENV/bin/python" "$APP_DIR/packaging/uninstall_gui.py"
+Icon=edit-delete
+Terminal=false
+Categories=Settings;Utility;
+EOF
+chmod 644 "$DESKTOP_DIR/flys-osc-chat-box-uninstall.desktop"
 if [[ "$WITH_DESKTOP" == true ]]; then
   desktop_path="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
   [[ -n "$desktop_path" && -d "$desktop_path" ]] || desktop_path="$HOME/Desktop"

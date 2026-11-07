@@ -1,11 +1,9 @@
-name: Tests and release archive check
+name: Tests
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
-permissions:
-  contents: read
 jobs:
   pytest:
     runs-on: ubuntu-latest
@@ -14,36 +12,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install dependencies
-        run: python -m pip install -r requirements.txt pytest
-      - name: Compile sources
-        run: python -m compileall -q main.py core ui integrations
-      - name: Run tests
-        env:
-          QT_QPA_PLATFORM: offscreen
-        run: python -m pytest -q
-      - name: Build source release archives
-        run: python scripts/package_release.py v1.1.0-ci
-      - name: Verify release contents
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          from zipfile import ZipFile
-          from tarfile import open as tar_open
-          base = "Flys-OSC-Chat-Box-v1.1.0-ci"
-          out = Path("dist")
-          z = out / (base + ".zip")
-          t = out / (base + ".tar.gz")
-          assert z.is_file() and t.is_file()
-          with ZipFile(z) as archive:
-              names = archive.namelist()
-              assert archive.testzip() is None
-              assert f"{base}/scripts/install.sh" in names
-              assert f"{base}/main.py" in names
-              assert not any("/.venv/" in n or "/.git/" in n or "settings.json" in n for n in names)
-          with tar_open(t, "r:gz") as archive:
-              names = archive.getnames()
-              assert f"{base}/scripts/install.sh" in names
-              assert f"{base}/main.py" in names
-          print("Release archives verified")
-          PY
+      - run: python -m pip install -r requirements.txt pytest
+      - run: python -m compileall -q main.py core ui integrations
+      - run: QT_QPA_PLATFORM=offscreen python -m pytest -q

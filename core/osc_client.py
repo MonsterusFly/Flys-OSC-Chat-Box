@@ -1,7 +1,10 @@
 """Minimal VRChat OSC sender. UDP is connectionless, so send != delivery confirmation."""
 from __future__ import annotations
 
-from pythonosc.udp_client import SimpleUDPClient
+try:
+    from pythonosc.udp_client import SimpleUDPClient
+except ImportError:
+    from core.simple_osc import SimpleUDPClient
 
 
 class OSCClient:

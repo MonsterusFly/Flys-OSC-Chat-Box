@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Uninstall Fly's OSC Chat Box
+Comment=Remove the RPM or local application while keeping saved profiles
+Exec=/usr/bin/python3 /usr/share/flys-osc-chat-box/packaging/uninstall_gui.py
+Icon=edit-delete
+Terminal=false
+Categories=Settings;Utility;
+StartupNotify=false

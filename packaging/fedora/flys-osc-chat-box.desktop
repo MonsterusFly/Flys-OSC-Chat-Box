@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Fly's OSC Chat Box
+Comment=VRChat OSC chatbox for Linux
+Exec=flys-osc-chat-box
+Icon=applications-multimedia
+Terminal=false
+Categories=AudioVideo;Utility;
+StartupNotify=true

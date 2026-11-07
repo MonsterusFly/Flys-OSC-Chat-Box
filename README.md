@@ -1,4 +1,6 @@
-# Fly's OSC Chat Box — Public Installer Preview v1.1.0
+> **RPM & uninstall:** See [RPM-INSTALL.md](RPM-INSTALL.md).
+
+# Fly's OSC Chat Box v1.2.0
 
 **New installers and GitHub packaging:** See [PUBLIC-RELEASE.md](PUBLIC-RELEASE.md).
 
