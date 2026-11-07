@@ -135,7 +135,7 @@ class Settings:
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
                 json.dump(asdict(self), handle, indent=2, ensure_ascii=False)
-                handle.write("\\n")
+                handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
 
