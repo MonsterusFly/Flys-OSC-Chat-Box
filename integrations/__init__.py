@@ -1,0 +1,1 @@
+"""Optional Linux desktop integrations."""
