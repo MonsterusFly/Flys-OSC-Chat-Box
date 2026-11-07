@@ -31,6 +31,9 @@ install -m 755 %{_sourcedir}/packaging/fedora/launch.sh %{buildroot}%{_bindir}/f
 install -m 644 %{_sourcedir}/packaging/fedora/flys-osc-chat-box.desktop %{buildroot}%{_datadir}/applications/
 install -m 644 %{_sourcedir}/packaging/fedora/flys-osc-chat-box-uninstall.desktop %{buildroot}%{_datadir}/applications/
 install -m 644 %{_sourcedir}/LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LICENSE
+install -m 644 %{_sourcedir}/LICENSES/OFL-1.1.txt %{buildroot}%{_datadir}/licenses/%{name}/OFL-1.1.txt
+mkdir -p %{buildroot}%{_datadir}/doc/%{name}
+install -m 644 %{_sourcedir}/THIRD_PARTY_NOTICES.md %{buildroot}%{_datadir}/doc/%{name}/THIRD_PARTY_NOTICES.md
 
 %files
 %{_bindir}/flys-osc-chat-box
@@ -38,6 +41,8 @@ install -m 644 %{_sourcedir}/LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LI
 %{_datadir}/applications/flys-osc-chat-box.desktop
 %{_datadir}/applications/flys-osc-chat-box-uninstall.desktop
 %{_datadir}/licenses/%{name}/LICENSE
+%{_datadir}/licenses/%{name}/OFL-1.1.txt
+%{_datadir}/doc/%{name}/THIRD_PARTY_NOTICES.md
 
 %changelog
 * Sat Nov 07 2026 MonsterusFly - 1.2.0-1

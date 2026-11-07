@@ -1,0 +1,21 @@
+Fly's OSC Chat Box - Bundled Emoji Artwork Notice
+
+The 48 PNG icons in this directory (000.png through 047.png) are small
+rasterized representations of Google Noto Color Emoji font glyphs.
+They were generated using Pillow and the project's core/emoji_icons.py
+rasterization procedure, resized to 64 x 64 pixels.
+
+Origin: Noto Color Emoji (Google Noto Emoji project)
+Source: https://github.com/googlefonts/noto-emoji
+Font copyright: Copyright 2022 Google Inc.
+Font license: SIL Open Font License 1.1 (OFL-1.1)
+License copy: ../../LICENSES/OFL-1.1.txt
+
+The project does not bundle or redistribute the NotoColorEmoji.ttf font.
+The upstream Noto repository distinguishes its OFL-licensed font files from
+Apache-2.0-licensed standalone image resources. These particular PNGs
+were generated from font glyphs; they were not copied from the upstream
+SVG/image asset repository.
+
+This notice applies to the emoji graphics, not to the MIT-licensed
+application code. No endorsement by Google is implied.

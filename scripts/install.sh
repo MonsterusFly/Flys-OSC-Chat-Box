@@ -50,7 +50,7 @@ STAGING="$APP_HOME/.app-staging-$$"
 trap 'rm -rf -- "$STAGING"' EXIT
 mkdir -p "$STAGING"
 # Copy only application files, never build caches, git internals, or a developer venv.
-for name in main.py requirements.txt core ui integrations assets packaging scripts LICENSE README.md; do
+for name in main.py requirements.txt core ui integrations assets packaging scripts LICENSE LICENSES THIRD_PARTY_NOTICES.md README.md; do
   cp -a -- "$SOURCE_DIR/$name" "$STAGING/$name"
 done
 find "$STAGING" -type d \( -name __pycache__ -o -name .pytest_cache \) -prune -exec rm -rf {} +

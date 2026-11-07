@@ -1,3 +1,5 @@
+**Third-party licensing and bundled emoji attribution:** see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), [emoji notice](assets/emoji/NOTICE.txt), and [OFL-1.1 text](LICENSES/OFL-1.1.txt).
+
 > **RPM & uninstall:** See [RPM-INSTALL.md](RPM-INSTALL.md).
 
 # Fly's OSC Chat Box v1.2.0
