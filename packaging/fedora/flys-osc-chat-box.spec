@@ -1,5 +1,5 @@
 Name:           flys-osc-chat-box
-Version:        1.2.0
+Version:        1.2.2
 Release:        1%{?dist}
 Summary:        VRChat OSC chatbox and music/status companion for Linux
 License:        MIT AND OFL-1.1
