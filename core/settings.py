@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import tempfile
 from dataclasses import asdict, dataclass, fields, field
 from pathlib import Path
 
@@ -123,14 +124,30 @@ class Settings:
     def save(self, path: Path | None = None) -> None:
         target = path if path is not None else config_path()
         target.parent.mkdir(parents=True, exist_ok=True)
-        tmp = target.with_suffix(".tmp")
-        tmp.write_text(json.dumps(asdict(self), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        # Never replace the last known good backup with corrupt settings.
-        if target.exists():
-            try:
-                json.loads(target.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                pass
-            else:
-                shutil.copy2(target, target.with_suffix(".json.bak"))
-        tmp.replace(target)
+        # Use a unique temporary file for every settings save.
+        fd, name = tempfile.mkstemp(
+            prefix="settings-",
+            suffix=".tmp",
+            dir=target.parent,
+        )
+        tmp = Path(name)
+
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(asdict(self), handle, indent=2, ensure_ascii=False)
+                handle.write("\\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+
+            # Preserve a valid previous settings backup.
+            if target.exists():
+                try:
+                    json.loads(target.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    pass
+                else:
+                    shutil.copy2(target, target.with_suffix(".json.bak"))
+
+            os.replace(tmp, target)
+        finally:
+            tmp.unlink(missing_ok=True)
