@@ -67,15 +67,46 @@ def installed_via_rpm() -> bool:
     ).returncode == 0)
 
 
+
 def fedora_version() -> str | None:
+    """Detect Fedora and compatible Fedora-based systems."""
     try:
-        contents = Path('/etc/os-release').read_text(encoding='utf-8')
-        values = dict(line.split('=', 1) for line in contents.splitlines() if '=' in line)
-        if values.get('ID', '').strip('"') != 'fedora':
+        values = {}
+
+        for line in Path("/etc/os-release").read_text(
+            encoding="utf-8"
+        ).splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                values[key] = value.strip().strip('"')
+
+        distro_id = values.get("ID", "")
+        distro_like = values.get("ID_LIKE", "").split()
+        version = values.get("VERSION_ID", "")
+
+        if distro_id != "fedora" and "fedora" not in distro_like:
             return None
-        number = values.get('VERSION_ID', '').strip('"')
-        return number if number.isdecimal() else None
-    except OSError:
+
+        if not version.isdecimal():
+            return None
+
+        result = subprocess.run(
+            ["rpm", "-E", "%{fedora}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            return None
+
+        if result.stdout.strip() != version:
+            return None
+
+        return version
+
+    except (OSError, subprocess.SubprocessError):
         return None
 
 
