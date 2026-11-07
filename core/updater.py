@@ -12,7 +12,7 @@ import tempfile
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.3.3"
 RELEASE_API = "https://api.github.com/repos/MonsterusFly/Flys-OSC-Chat-Box/releases/latest"
 RELEASES_URL = "https://github.com/MonsterusFly/Flys-OSC-Chat-Box/releases"
 MAX_JSON = 1024 * 1024
