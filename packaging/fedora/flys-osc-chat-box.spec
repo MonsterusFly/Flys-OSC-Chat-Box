@@ -1,5 +1,5 @@
 Name:           flys-osc-chat-box
-Version:        1.2.2
+Version:        1.3.0
 Release:        1%{?dist}
 Summary:        VRChat OSC chatbox and music/status companion for Linux
 License:        MIT AND OFL-1.1
@@ -45,5 +45,8 @@ install -m 644 %{_sourcedir}/THIRD_PARTY_NOTICES.md %{buildroot}%{_datadir}/doc/
 %{_datadir}/doc/%{name}/THIRD_PARTY_NOTICES.md
 
 %changelog
+* Sat Nov 07 2026 MonsterusFly - 1.3.0-1
+- Add update detection and user-authorized RPM update integration
+
 * Sat Nov 07 2026 MonsterusFly - 1.2.0-1
 - Add RPM packaging and graphical uninstall option

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget, QInputDialog, QDialog, QGridLayout, QScrollArea, QToolButton, QSizePolicy, QLayout, QFileDialog,
 )
 
+from core.updater import APP_VERSION, RELEASES_URL, check_release, download_verified_rpm, installed_via_rpm, rpm_install_command, explain_update_error, human_size
 from core.message_engine import MAX_CHARS, PRESETS, render_template, unknown_variables
 from core.emojis import matching_emojis, EMOJIS
 from core.emoji_assets import emoji_icon_path
@@ -68,7 +70,7 @@ class MainWindow(QMainWindow):
         self.custom_layouts = dict(self.settings.custom_layouts or {})
         self.section_composer = SectionComposer()
         self.message_sections = clean_sections(self.settings.message_sections)
-        self.setWindowTitle("Fly's OSC Chat Box · v1.0.0")
+        self.setWindowTitle(f"Fly's OSC Chat Box · v{APP_VERSION}")
         self.resize(1000, 700)
         self.setMinimumSize(550, 420)
         self._build_ui()
@@ -96,6 +98,20 @@ class MainWindow(QMainWindow):
         self._update_rotation_timer()
         self._refresh_status_ui()
         self._refresh_preview()
+
+        self._update_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="release-update")
+        self._update_future = None
+        self._update_action = None
+        self._available_release = None
+        self._downloaded_update = None
+        self._update_install_process = None
+        self._update_timer = QTimer(self)
+        self._update_timer.setInterval(250)
+        self._update_timer.timeout.connect(self._update_tick)
+        self._update_timer.start()
+        # Startup check is optional and delayed until the main window loads.
+        if self.settings.check_updates:
+            QTimer.singleShot(3000, lambda: self._check_for_updates(silent=True))
 
     def _build_ui(self):
         central = QWidget(self)
@@ -810,6 +826,7 @@ class MainWindow(QMainWindow):
             self._music_executor.shutdown(wait=False, cancel_futures=True)
             self._player_scan_executor.shutdown(wait=False, cancel_futures=True)
             self._gpu_executor.shutdown(wait=False, cancel_futures=True)
+            self._update_executor.shutdown(wait=False, cancel_futures=True)
             self.app.quit()
         except (OSError, ValueError, TypeError) as exc:
             QMessageBox.warning(self, "Restore failed", str(exc))
@@ -899,6 +916,36 @@ class MainWindow(QMainWindow):
         form.addRow(self.only_changed)
         form.addRow(self.minimize_to_tray)
         layout.addWidget(behavior)
+        update_group = QGroupBox("Software updates")
+        update_layout = QVBoxLayout(update_group)
+        self.update_version = QLabel(f"Installed application version: {APP_VERSION}")
+        update_layout.addWidget(self.update_version)
+        self.check_updates_checkbox = QCheckBox("Check GitHub for updates when the app starts")
+        self.check_updates_checkbox.setChecked(self.settings.check_updates)
+        update_layout.addWidget(self.check_updates_checkbox)
+        self.auto_download_checkbox = QCheckBox("Automatically download verified Fedora RPMs (never install silently)")
+        self.auto_download_checkbox.setChecked(self.settings.auto_download_updates)
+        update_layout.addWidget(self.auto_download_checkbox)
+        self.update_status = QLabel("No update check performed yet")
+        self.update_status.setWordWrap(True)
+        update_layout.addWidget(self.update_status)
+        self.update_details = QLabel("Release details will appear after checking for updates.")
+        self.update_details.setTextFormat(Qt.TextFormat.PlainText)
+        self.update_details.setWordWrap(True)
+        self.update_details.setMaximumHeight(165)
+        update_layout.addWidget(self.update_details)
+        self.update_check_button = QPushButton("Check for updates")
+        self.update_install_button = QPushButton("Download and install update…")
+        self.update_install_button.setEnabled(False)
+        self.update_page_button = QPushButton("Open GitHub releases")
+        update_layout.addWidget(self.update_check_button)
+        update_layout.addWidget(self.update_install_button)
+        update_layout.addWidget(self.update_page_button)
+        hint = QLabel("RPM updates require your confirmation and Fedora administrator authentication. Other install types open GitHub for manual updates. The app never installs updates silently.")
+        hint.setObjectName("subtitle")
+        hint.setWordWrap(True)
+        update_layout.addWidget(hint)
+        layout.addWidget(update_group)
         backup_group = QGroupBox("Backup and restore")
         backup_layout = QVBoxLayout(backup_group)
         backup_hint = QLabel("Export all profiles, composer layouts, theme, music preferences and OSC settings. Import requires restarting the application.")
@@ -989,6 +1036,11 @@ class MainWindow(QMainWindow):
         self.send_btn.clicked.connect(self._manual_send)
         self.save_btn.clicked.connect(self._save_settings)
         self.settings_save_btn.clicked.connect(self._save_settings)
+        self.update_check_button.clicked.connect(self._check_for_updates)
+        self.update_install_button.clicked.connect(self._start_update_install)
+        self.update_page_button.clicked.connect(lambda: __import__('webbrowser').open(RELEASES_URL))
+        self.check_updates_checkbox.toggled.connect(self._queue_autosave)
+        self.auto_download_checkbox.toggled.connect(self._queue_autosave)
         self.backup_export_btn.clicked.connect(self._export_settings_backup)
         self.backup_import_btn.clicked.connect(self._restore_settings_backup)
         self.music_fallback.toggled.connect(self._queue_autosave)
@@ -1349,7 +1401,8 @@ class MainWindow(QMainWindow):
             selected_status=self.selected_status, rotate_statuses=self.rotate_status.isChecked(),
             status_rotation_interval=self.rotation_interval.value(),
             section_mode=self.section_mode.isChecked(), message_sections=clean_sections(self.message_sections),
-            theme=self.theme_select.currentText(), version=10,
+            theme=self.theme_select.currentText(), check_updates=self.check_updates_checkbox.isChecked(),
+            auto_download_updates=self.auto_download_checkbox.isChecked(), version=10,
         )
 
     def _save_settings(self):
@@ -1362,6 +1415,111 @@ class MainWindow(QMainWindow):
             self._notice(f"Failed to save settings: {exc}")
             QMessageBox.warning(self, "Save failed", str(exc))
 
+    def _check_for_updates(self, silent=False):
+        if self._update_future is not None or self._update_install_process is not None:
+            return
+        self._update_action = ('check', silent)
+        self._available_release = None
+        self._downloaded_update = None
+        self.update_install_button.setText("Download and install update…")
+        self.update_install_button.setEnabled(False)
+        self.update_check_button.setEnabled(False)
+        self.update_status.setText("Checking GitHub releases…")
+        self._update_future = self._update_executor.submit(check_release)
+
+    def _can_download_update(self, release):
+        return bool(release and release.get('rpm_url') and release.get('checksum_url') and installed_via_rpm())
+
+    def _download_update(self, *, automatic=False):
+        if self._update_future is not None or not self._can_download_update(self._available_release):
+            return
+        self._update_action = ('download', automatic)
+        self.update_install_button.setEnabled(False)
+        self.update_status.setText("Downloading and verifying the Fedora RPM…")
+        self._update_future = self._update_executor.submit(download_verified_rpm, dict(self._available_release))
+
+    def _update_tick(self):
+        future = self._update_future
+        if future is not None and future.done():
+            self._update_future = None
+            action, automatic = self._update_action
+            try:
+                result = future.result()
+            except Exception as exc:
+                message = explain_update_error(exc)
+                self.update_status.setText(f"Update {action} failed: {message}")
+                if action == 'download':
+                    self.update_install_button.setEnabled(self._can_download_update(self._available_release))
+                if not automatic:
+                    QMessageBox.warning(self, "Update error", message)
+            else:
+                if action == 'check':
+                    self._available_release = result
+                    if result is None:
+                        self.update_status.setText(f"You're up to date (v{APP_VERSION}).")
+                        self.update_details.setText("No newer public release found.")
+                    else:
+                        detail = (f"Available version: {result['version']}\n"
+                                  f"Fedora RPM: {result.get('rpm_name') or 'Not available for this Fedora version'}\n"
+                                  f"Download size: {human_size(result.get('rpm_size'))}\n\n"
+                                  f"Release notes:\n{result.get('notes', 'No release notes provided.')}")
+                        self.update_details.setText(detail)
+                        compatible = self._can_download_update(result)
+                        self.update_status.setText(
+                            f"Update v{result['version']} available. " +
+                            ("Verified RPM installation supported." if compatible else
+                             "Automatic RPM installation unavailable here; use GitHub Releases.")
+                        )
+                        self.update_install_button.setEnabled(compatible)
+                        if automatic and self.tray is not None:
+                            self.tray.showMessage("Fly's OSC Chat Box update", f"Version {result['version']} is available. See Settings > Software updates.")
+                        if not automatic:
+                            QMessageBox.information(self, "Update available", f"Version {result['version']} is available. See Settings for release notes.")
+                        if compatible and self.auto_download_checkbox.isChecked():
+                            self._download_update(automatic=True)
+                elif action == 'download':
+                    self._downloaded_update = result
+                    self.update_status.setText("Update downloaded and checksum verified. Ready to install with your approval.")
+                    self.update_install_button.setText("Install verified update…")
+                    self.update_install_button.setEnabled(True)
+                    if automatic and self.tray is not None:
+                        self.tray.showMessage("Fly's OSC Chat Box update", "A verified update is ready. Open Settings to approve installation.")
+            self.update_check_button.setEnabled(self._update_future is None)
+        proc = self._update_install_process
+        if proc is not None and proc.poll() is not None:
+            self._update_install_process = None
+            if proc.returncode == 0:
+                self.update_status.setText("Update installed. Quit and reopen the application to use the new version.")
+                QMessageBox.information(self, "Update installed", "The RPM update was installed successfully. Quit and reopen Fly's OSC Chat Box to run the new version. Your settings are preserved.")
+            else:
+                self.update_status.setText("Update installation cancelled or failed. Check DNF/Polkit messages.")
+                QMessageBox.warning(self, "Update not installed", "Fedora did not complete the RPM update. Your current version is unchanged.")
+            self.update_install_button.setEnabled(self._can_download_update(self._available_release))
+
+    def _start_update_install(self):
+        release = self._available_release
+        if not self._can_download_update(release) or self._update_future is not None:
+            return
+        if self._downloaded_update is None:
+            if QMessageBox.question(self, "Download update", f"Download v{release['version']} from the official GitHub release?\n\nIts checksum will be verified before installation.") != QMessageBox.StandardButton.Yes:
+                return
+            self._download_update(automatic=False)
+            return
+        if QMessageBox.question(self, "Install verified update", f"Install verified v{release['version']} now?\n\nFedora will ask for administrator authorization. Your saved statuses and settings will be kept.") != QMessageBox.StandardButton.Yes:
+            return
+        self._begin_authorized_install(self._downloaded_update)
+
+    def _begin_authorized_install(self, rpm_path):
+        try:
+            command = rpm_install_command(rpm_path)
+            self._update_install_process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.update_status.setText("Waiting for Fedora administrator authorization and installation…")
+            self.update_install_button.setEnabled(False)
+        except Exception as exc:
+            self.update_status.setText(f"Unable to start RPM installation: {exc}")
+            QMessageBox.warning(self, "Update error", str(exc))
+            self.update_install_button.setEnabled(True)
+
     def _show_window(self):
         self.showNormal()
         self.raise_()
@@ -1373,6 +1531,7 @@ class MainWindow(QMainWindow):
         self._music_executor.shutdown(wait=False, cancel_futures=True)
         self._player_scan_executor.shutdown(wait=False, cancel_futures=True)
         self._gpu_executor.shutdown(wait=False, cancel_futures=True)
+        self._update_executor.shutdown(wait=False, cancel_futures=True)
         if hasattr(self, "_control_executor"):
             self._control_executor.shutdown(wait=False, cancel_futures=True)
         self.app.quit()
@@ -1389,5 +1548,6 @@ class MainWindow(QMainWindow):
             self._music_executor.shutdown(wait=False, cancel_futures=True)
             self._player_scan_executor.shutdown(wait=False, cancel_futures=True)
             self._gpu_executor.shutdown(wait=False, cancel_futures=True)
+            self._update_executor.shutdown(wait=False, cancel_futures=True)
             if hasattr(self, "_control_executor"):
                 self._control_executor.shutdown(wait=False, cancel_futures=True)

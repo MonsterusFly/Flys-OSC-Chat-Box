@@ -48,6 +48,8 @@ class Settings:
     rotate_statuses: bool = False
     status_rotation_interval: int = 60
     theme: str = "Midnight Blue"
+    check_updates: bool = True
+    auto_download_updates: bool = False
     version: int = 10
 
     @classmethod
@@ -112,6 +114,8 @@ class Settings:
             obj.selected_status = max(0, min(len(clean) - 1, int(obj.selected_status))) if clean else (0 if obj.status_profiles is None else -1)
             obj.status_rotation_interval = max(5, min(3600, int(obj.status_rotation_interval)))
             obj.rotate_statuses = bool(obj.rotate_statuses)
+            obj.check_updates = bool(obj.check_updates)
+            obj.auto_download_updates = bool(obj.auto_download_updates)
             return obj
         except (OSError, ValueError, TypeError, OverflowError):
             return cls()
